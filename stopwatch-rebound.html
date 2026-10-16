@@ -1,0 +1,350 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Rebound 스탑워치</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;600;800&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg: #07090d;
+    --panel: #0e121a;
+    --line: #1c2230;
+    --text: #e8ecf3;
+    --muted: #6b7486;
+    /* 한국식: 상승 = 빨강, 하락 = 파랑 */
+    --up: #ff3b4f;
+    --up-soft: rgba(255, 59, 79, .14);
+    --down: #3d7bff;
+  }
+  :root[data-scheme="us"] {
+    --up: #16e08a;
+    --up-soft: rgba(22, 224, 138, .14);
+    --down: #ff4d5e;
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; }
+  body {
+    min-height: 100vh;
+    background:
+      radial-gradient(ellipse 80% 50% at 50% 100%, var(--up-soft), transparent 70%),
+      var(--bg);
+    color: var(--text);
+    font-family: "JetBrains Mono", Consolas, "Malgun Gothic", monospace;
+    overflow-x: hidden;
+  }
+
+  /* ── 티커 테이프 ── */
+  .tape {
+    border-bottom: 1px solid var(--line);
+    background: #0a0d13;
+    overflow: hidden;
+    white-space: nowrap;
+    font-size: 13px;
+    padding: 9px 0;
+  }
+  .tape-track { display: inline-block; animation: scroll 40s linear infinite; }
+  .tape-item { display: inline-block; margin-right: 36px; }
+  .tape-item b { color: var(--text); font-weight: 600; margin-right: 8px; }
+  .tape-item span { color: var(--up); }
+  @keyframes scroll { to { transform: translateX(-50%); } }
+
+  .wrap { max-width: 720px; margin: 0 auto; padding: 28px 16px 48px; }
+
+  header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; }
+  .brand { font-weight: 800; letter-spacing: .08em; font-size: 15px; }
+  .brand em { font-style: normal; color: var(--up); }
+  .live { display: flex; align-items: center; gap: 8px; font-size: 12px; color: var(--muted); }
+  .dot { width: 8px; height: 8px; border-radius: 50%; background: var(--muted); }
+  body.running .dot { background: var(--up); animation: pulse 1.2s infinite; }
+  body.running .live { color: var(--up); }
+  @keyframes pulse { 50% { opacity: .25; } }
+  .scheme {
+    background: none; border: 1px solid var(--line); color: var(--muted);
+    font: inherit; font-size: 11px; padding: 5px 9px; border-radius: 6px; cursor: pointer;
+  }
+
+  /* ── 메인 패널 ── */
+  .panel {
+    background: var(--panel);
+    border: 1px solid var(--line);
+    border-radius: 16px;
+    padding: 24px 24px 8px;
+  }
+  .label { font-size: 12px; color: var(--muted); letter-spacing: .1em; }
+  .time {
+    font-size: clamp(52px, 14vw, 96px);
+    font-weight: 800;
+    font-variant-numeric: tabular-nums;
+    letter-spacing: -.02em;
+    line-height: 1.05;
+    margin: 6px 0 10px;
+    transition: color .3s;
+  }
+  body.running .time { color: var(--up); text-shadow: 0 0 32px var(--up-soft); }
+  .change { display: flex; gap: 10px; align-items: center; font-size: 15px; font-weight: 600; }
+  .badge {
+    background: var(--up-soft); color: var(--up);
+    padding: 4px 10px; border-radius: 6px;
+  }
+  .change .sub { color: var(--muted); font-weight: 400; font-size: 13px; }
+  canvas { display: block; width: 100%; height: 220px; margin-top: 18px; }
+
+  /* ── 버튼 ── */
+  .buttons { display: grid; grid-template-columns: 1fr 2fr; gap: 12px; margin: 16px 0 28px; }
+  button.act {
+    height: 64px; border-radius: 12px; border: 1px solid var(--line);
+    font: inherit; font-size: 17px; font-weight: 800; letter-spacing: .06em;
+    cursor: pointer; transition: transform .08s, opacity .15s;
+  }
+  button.act:active { transform: scale(.98); }
+  button.act:disabled { opacity: .35; cursor: default; }
+  #lapReset { background: var(--panel); color: var(--text); }
+  #startStop { background: var(--up); color: #fff; border-color: transparent; box-shadow: 0 8px 28px var(--up-soft); }
+  #startStop.running { background: var(--panel); color: var(--text); border-color: var(--line); box-shadow: none; }
+
+  /* ── 랩 = 체결 내역 ── */
+  .book-head, .row {
+    display: grid; grid-template-columns: 1fr 1.4fr 1.4fr 1fr;
+    padding: 10px 4px; font-size: 13px; font-variant-numeric: tabular-nums;
+  }
+  .book-head { color: var(--muted); font-size: 11px; letter-spacing: .1em; border-bottom: 1px solid var(--line); }
+  .row { border-bottom: 1px solid var(--line); animation: flash .8s; }
+  .row > :not(:first-child), .book-head > :not(:first-child) { text-align: right; }
+  .row .up { color: var(--up); }
+  .row .down { color: var(--down); }
+  @keyframes flash { from { background: var(--up-soft); } }
+  .empty { color: var(--muted); font-size: 13px; padding: 18px 4px; }
+  .hint { color: var(--muted); font-size: 11px; margin-top: 18px; text-align: center; }
+
+  @media (max-width: 480px) {
+    .panel { padding: 18px 16px 4px; }
+    canvas { height: 170px; }
+    .book-head, .row { grid-template-columns: .8fr 1.4fr 1.3fr 1fr; font-size: 12px; }
+  }
+</style>
+</head>
+<body>
+<div class="tape"><div class="tape-track" id="tape"></div></div>
+
+<div class="wrap">
+  <header>
+    <div class="brand">REBOUND<em>▲</em> STOPWATCH</div>
+    <div style="display:flex;gap:14px;align-items:center">
+      <div class="live"><span class="dot"></span><span id="liveText">장 대기</span></div>
+      <button class="scheme" id="scheme">상승색: 한국</button>
+    </div>
+  </header>
+
+  <div class="panel">
+    <div class="label">경과 시간</div>
+    <div class="time" id="display">00:00.00</div>
+    <div class="change">
+      <span class="badge" id="pct">▲ +0.00%</span>
+      <span class="sub" id="sub">바닥 확인 중</span>
+    </div>
+    <canvas id="chart"></canvas>
+  </div>
+
+  <div class="buttons">
+    <button class="act" id="lapReset" disabled>랩</button>
+    <button class="act" id="startStop">시작</button>
+  </div>
+
+  <div class="book-head"><span>랩</span><span>구간</span><span>누적</span><span>등락</span></div>
+  <div id="laps"><div class="empty">아직 체결된 랩이 없습니다.</div></div>
+
+  <div class="hint">Space 시작/정지 · L 랩/재설정</div>
+</div>
+
+<script>
+  const $ = id => document.getElementById(id);
+  const display = $('display'), startStop = $('startStop'), lapReset = $('lapReset');
+  const pctEl = $('pct'), subEl = $('sub'), lapsEl = $('laps'), liveText = $('liveText');
+  const canvas = $('chart'), ctx = canvas.getContext('2d');
+
+  /* ── 스탑워치 상태 ── */
+  let running = false, startTime = 0, elapsed = 0, lapStart = 0, laps = [], rafId = null;
+
+  const pad = n => String(n).padStart(2, '0');
+  function format(ms) {
+    const h = Math.floor(ms / 3600000);
+    return (h ? h + ':' : '') + pad(Math.floor(ms / 60000) % 60) + ':' +
+      pad(Math.floor(ms / 1000) % 60) + '.' + pad(Math.floor(ms / 10) % 100);
+  }
+  const total = () => running ? elapsed + (performance.now() - startTime) : elapsed;
+  // 시간이 갈수록 계속 오르는 상승률
+  const gain = ms => Math.log1p(ms / 1000) * 4.2 + ms / 30000;
+
+  /* ── 티커 테이프 ── */
+  const indices = [
+    ['KOSPI', 1.0], ['KOSDAQ', 1.4], ['S&P 500', .9], ['NASDAQ', 1.3], ['DOW', .7],
+    ['NIKKEI 225', 1.1], ['HANG SENG', 1.2], ['DAX', .8], ['FTSE 100', .6], ['SOX', 1.8]
+  ];
+  const tapeSpans = [];
+  $('tape').innerHTML = [0, 1].map(() => indices.map(([n]) =>
+    `<span class="tape-item"><b>${n}</b><span>▲ +0.00%</span></span>`).join('')).join('');
+  $('tape').querySelectorAll('.tape-item > span').forEach((s, i) => tapeSpans.push([s, indices[i % indices.length][1]]));
+  function updateTape(g) {
+    tapeSpans.forEach(([s, k]) => s.textContent = `▲ +${(0.12 + g * k * .6).toFixed(2)}%`);
+  }
+
+  /* ── 차트: 폭락 구간 + 반등 구간 ── */
+  const MAX = 160;
+  const crash = [];
+  let v = 100;
+  for (let i = 0; i < 70; i++) { v += -0.9 + (Math.random() - .5) * 2.4; crash.push(v); }
+  let rebound = [];
+  let lastPush = 0;
+
+  function css(name) { return getComputedStyle(document.documentElement).getPropertyValue(name).trim(); }
+
+  function resize() {
+    const dpr = window.devicePixelRatio || 1;
+    canvas.width = canvas.clientWidth * dpr;
+    canvas.height = canvas.clientHeight * dpr;
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    draw();
+  }
+
+  function draw() {
+    const w = canvas.clientWidth, h = canvas.clientHeight;
+    const all = crash.concat(rebound);
+    const start = Math.max(0, all.length - MAX);
+    const pts = all.slice(start);
+    const split = Math.max(0, crash.length - start); // 반등이 시작되는 인덱스
+    const min = Math.min(...pts), max = Math.max(...pts);
+    const padY = (max - min) * .15 + 1;
+    const x = i => i / (MAX - 1) * w;
+    const y = p => h - 8 - (p - (min - padY)) / ((max + padY) - (min - padY)) * (h - 16);
+    const up = css('--up'), down = css('--down');
+
+    ctx.clearRect(0, 0, w, h);
+
+    // 격자
+    ctx.strokeStyle = css('--line'); ctx.lineWidth = 1; ctx.setLineDash([3, 5]);
+    for (let i = 1; i < 4; i++) { ctx.beginPath(); ctx.moveTo(0, h * i / 4); ctx.lineTo(w, h * i / 4); ctx.stroke(); }
+    ctx.setLineDash([]);
+
+    // 폭락 구간
+    if (split > 1) {
+      ctx.globalAlpha = .55;
+      ctx.strokeStyle = down; ctx.lineWidth = 1.6;
+      ctx.beginPath();
+      for (let i = 0; i < split; i++) i ? ctx.lineTo(x(i), y(pts[i])) : ctx.moveTo(x(i), y(pts[i]));
+      ctx.stroke();
+      ctx.globalAlpha = 1;
+    }
+
+    // 반등 구간
+    const r0 = Math.max(0, split - 1);
+    if (pts.length - r0 > 1) {
+      const grad = ctx.createLinearGradient(0, 0, 0, h);
+      grad.addColorStop(0, up + '55'); grad.addColorStop(1, up + '00');
+      ctx.beginPath();
+      ctx.moveTo(x(r0), h);
+      for (let i = r0; i < pts.length; i++) ctx.lineTo(x(i), y(pts[i]));
+      ctx.lineTo(x(pts.length - 1), h);
+      ctx.fillStyle = grad; ctx.fill();
+
+      ctx.beginPath();
+      for (let i = r0; i < pts.length; i++) i === r0 ? ctx.moveTo(x(i), y(pts[i])) : ctx.lineTo(x(i), y(pts[i]));
+      ctx.strokeStyle = up; ctx.lineWidth = 2.4; ctx.shadowColor = up; ctx.shadowBlur = 14;
+      ctx.stroke(); ctx.shadowBlur = 0;
+    }
+
+    // 현재가 점 + 점선
+    const li = pts.length - 1, lx = x(li), ly = y(pts[li]);
+    const c = rebound.length ? up : down;
+    ctx.strokeStyle = c; ctx.globalAlpha = .4; ctx.setLineDash([2, 4]);
+    ctx.beginPath(); ctx.moveTo(0, ly); ctx.lineTo(w, ly); ctx.stroke();
+    ctx.setLineDash([]); ctx.globalAlpha = 1;
+    const pulse = running ? 4 + Math.sin(performance.now() / 180) * 2 : 4;
+    ctx.fillStyle = c; ctx.beginPath(); ctx.arc(lx, ly, pulse, 0, Math.PI * 2); ctx.fill();
+  }
+
+  /* ── 루프 ── */
+  let lastTape = 0;
+  function render(now) {
+    const t = total(), g = gain(t);
+    display.textContent = format(t);
+    pctEl.textContent = `▲ +${g.toFixed(2)}%`;
+    subEl.textContent = t === 0 ? '바닥 확인 중' : g < 8 ? '저점 반등 시작' : g < 16 ? '상승 추세 전환' : g < 24 ? '연일 신고가' : '역대 최고치 경신';
+    if (running && now - lastPush > 350) {
+      const base = rebound.length ? rebound[rebound.length - 1] : crash[crash.length - 1];
+      rebound.push(base + .9 + (Math.random() - .42) * 2.4);
+      lastPush = now;
+    }
+    if (now - lastTape > 250) { updateTape(g); lastTape = now; }
+    draw();
+  }
+  function loop(now) { render(now); rafId = requestAnimationFrame(loop); }
+
+  /* ── 랩 ── */
+  function renderLaps() {
+    if (!laps.length) { lapsEl.innerHTML = '<div class="empty">아직 체결된 랩이 없습니다.</div>'; return; }
+    lapsEl.innerHTML = '';
+    let cum = 0;
+    laps.forEach((t, i) => {
+      cum += t;
+      const prev = laps[i - 1];
+      const faster = prev === undefined || t <= prev;          // 이전 랩보다 빠르면 상승
+      const diff = prev === undefined ? 0 : (prev - t) / prev * 100;
+      const row = document.createElement('div');
+      row.className = 'row';
+      row.innerHTML = `<span>#${i + 1}</span><span>${format(t)}</span><span>${format(cum)}</span>` +
+        (prev === undefined ? '<span>—</span>' :
+        `<span class="${faster ? 'up' : 'down'}">${faster ? '▲' : '▼'} ${Math.abs(diff).toFixed(1)}%</span>`);
+      lapsEl.prepend(row);
+    });
+  }
+
+  /* ── 버튼 ── */
+  startStop.addEventListener('click', () => {
+    if (running) {
+      elapsed = total(); running = false;
+      cancelAnimationFrame(rafId); render(performance.now());
+      startStop.textContent = '시작'; startStop.classList.remove('running');
+      lapReset.textContent = '재설정';
+      document.body.classList.remove('running'); liveText.textContent = '장 마감';
+    } else {
+      startTime = performance.now(); running = true;
+      rafId = requestAnimationFrame(loop);
+      startStop.textContent = '정지'; startStop.classList.add('running');
+      lapReset.textContent = '랩'; lapReset.disabled = false;
+      document.body.classList.add('running'); liveText.textContent = 'LIVE';
+    }
+  });
+
+  lapReset.addEventListener('click', () => {
+    if (running) {
+      const now = total();
+      laps.push(now - lapStart); lapStart = now;
+      renderLaps();
+    } else {
+      elapsed = 0; lapStart = 0; laps = []; rebound = [];
+      renderLaps(); render(performance.now());
+      lapReset.textContent = '랩'; lapReset.disabled = true;
+      liveText.textContent = '장 대기';
+    }
+  });
+
+  $('scheme').addEventListener('click', e => {
+    const us = document.documentElement.dataset.scheme !== 'us';
+    document.documentElement.dataset.scheme = us ? 'us' : '';
+    e.target.textContent = '상승색: ' + (us ? '미국' : '한국');
+    draw();
+  });
+
+  document.addEventListener('keydown', e => {
+    if (e.code === 'Space') { e.preventDefault(); startStop.click(); }
+    if (e.key === 'l' || e.key === 'L') { if (!lapReset.disabled) lapReset.click(); }
+  });
+
+  window.addEventListener('resize', resize);
+  resize();
+  render(performance.now());
+</script>
+</body>
+</html>

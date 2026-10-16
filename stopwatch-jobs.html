@@ -1,0 +1,362 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>출근길 스탑워치</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@400;500;700;900&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --ink: #1c2033;
+    --muted: #6a6f85;
+    --glass: rgba(255, 255, 255, .86);
+    --line: rgba(28, 32, 51, .09);
+    --accent: #ff7a45;
+    --accent-soft: rgba(255, 122, 69, .14);
+    --pass: #1f9d63;
+    --pass-soft: rgba(31, 157, 99, .12);
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; }
+  body {
+    min-height: 100vh;
+    background: #0f1733;
+    color: var(--ink);
+    font-family: "Noto Sans KR", "Malgun Gothic", sans-serif;
+    overflow-x: hidden;
+  }
+  #sky { position: fixed; inset: 0; width: 100%; height: 100%; z-index: 0; }
+
+  /* ── 채용 뉴스 티커 ── */
+  .tape {
+    position: relative; z-index: 1;
+    background: rgba(255, 255, 255, .1);
+    backdrop-filter: blur(6px);
+    color: #fff;
+    overflow: hidden; white-space: nowrap;
+    font-size: 13px; padding: 9px 0;
+  }
+  .tape-track { display: inline-block; animation: scroll 45s linear infinite; }
+  .tape-item { display: inline-block; margin-right: 40px; opacity: .92; }
+  .tape-item b { font-weight: 700; color: #ffd27a; margin-left: 6px; }
+  @keyframes scroll { to { transform: translateX(-50%); } }
+
+  .wrap { position: relative; z-index: 1; max-width: 520px; margin: 0 auto; padding: 40px 16px 260px; }
+
+  .card {
+    background: var(--glass);
+    backdrop-filter: blur(14px);
+    border-radius: 24px;
+    padding: 28px 26px 22px;
+    box-shadow: 0 24px 60px rgba(10, 14, 40, .28);
+  }
+  .top { display: flex; justify-content: space-between; align-items: center; }
+  .brand { font-weight: 900; font-size: 15px; letter-spacing: -.01em; }
+  .brand span { color: var(--accent); }
+  .status {
+    font-size: 12px; font-weight: 500; color: var(--muted);
+    display: flex; align-items: center; gap: 6px;
+  }
+  .status i { width: 7px; height: 7px; border-radius: 50%; background: #b8bccb; }
+  body.running .status { color: var(--pass); }
+  body.running .status i { background: var(--pass); animation: pulse 1.4s infinite; }
+  @keyframes pulse { 50% { opacity: .3; } }
+
+  .time {
+    font-size: clamp(56px, 17vw, 92px);
+    font-weight: 900;
+    font-variant-numeric: tabular-nums;
+    letter-spacing: -.03em;
+    text-align: center;
+    margin: 18px 0 4px;
+  }
+  .stage { text-align: center; font-size: 15px; font-weight: 700; color: var(--accent); min-height: 22px; }
+
+  .stats { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin: 22px 0 18px; }
+  .stat { background: #fff; border: 1px solid var(--line); border-radius: 14px; padding: 12px 14px; }
+  .stat small { display: block; font-size: 11px; color: var(--muted); margin-bottom: 4px; }
+  .stat strong { font-size: 20px; font-weight: 900; font-variant-numeric: tabular-nums; }
+  .stat em { font-style: normal; font-size: 12px; font-weight: 700; color: var(--pass); margin-left: 4px; }
+  .meter { height: 6px; border-radius: 3px; background: var(--line); margin-top: 8px; overflow: hidden; }
+  .meter div { height: 100%; width: 0; background: linear-gradient(90deg, var(--accent), #ffc24b); border-radius: 3px; }
+
+  .buttons { display: grid; grid-template-columns: 1fr 1.6fr; gap: 10px; }
+  button.act {
+    height: 58px; border-radius: 14px; border: none;
+    font: inherit; font-size: 17px; font-weight: 700;
+    cursor: pointer; transition: transform .08s, opacity .15s;
+  }
+  button.act:active { transform: scale(.97); }
+  button.act:disabled { opacity: .4; cursor: default; }
+  #lapReset { background: #eef0f5; color: var(--ink); }
+  #startStop { background: var(--accent); color: #fff; box-shadow: 0 10px 24px var(--accent-soft); }
+  #startStop.running { background: var(--ink); box-shadow: none; }
+
+  /* ── 랩 = 합격 통보 ── */
+  .offers { margin-top: 20px; max-height: 280px; overflow-y: auto; }
+  .offers h3 { font-size: 12px; color: var(--muted); font-weight: 500; margin: 0 0 8px; }
+  .offer {
+    display: flex; align-items: center; gap: 12px;
+    padding: 11px 12px; border-radius: 12px; background: #fff;
+    border: 1px solid var(--line); margin-bottom: 8px;
+    animation: rise .5s cubic-bezier(.2, .9, .3, 1.3);
+  }
+  @keyframes rise { from { opacity: 0; transform: translateY(10px) scale(.97); } }
+  .stamp {
+    flex: none; width: 46px; height: 46px; border-radius: 50%;
+    border: 2px solid var(--pass); color: var(--pass);
+    display: grid; place-items: center;
+    font-size: 12px; font-weight: 900; transform: rotate(-12deg);
+    background: var(--pass-soft);
+  }
+  .offer .info { flex: 1; min-width: 0; }
+  .offer .info b { display: block; font-size: 14px; }
+  .offer .info span { font-size: 12px; color: var(--muted); }
+  .offer .t { font-weight: 700; font-variant-numeric: tabular-nums; font-size: 15px; }
+  .empty { font-size: 13px; color: var(--muted); padding: 6px 2px; }
+  .hint { text-align: center; font-size: 11px; color: var(--muted); margin-top: 14px; }
+
+  @media (max-width: 420px) {
+    .card { padding: 22px 18px 18px; }
+    .stat strong { font-size: 17px; }
+  }
+</style>
+</head>
+<body>
+<canvas id="sky"></canvas>
+<div class="tape"><div class="tape-track" id="tape"></div></div>
+
+<div class="wrap">
+  <div class="card">
+    <div class="top">
+      <div class="brand">출근길<span>.</span> 스탑워치</div>
+      <div class="status"><i></i><span id="statusText">새벽 6시, 출근 준비</span></div>
+    </div>
+
+    <div class="time" id="display">00:00.00</div>
+    <div class="stage" id="stage">버튼을 누르면 하루가 시작됩니다</div>
+
+    <div class="stats">
+      <div class="stat">
+        <small>새로 열린 채용 공고</small>
+        <strong id="jobs">0</strong><em id="jobsUp"></em>
+      </div>
+      <div class="stat">
+        <small>구직자 1명당 일자리</small>
+        <strong id="ratio">0.60</strong><em>개</em>
+        <div class="meter"><div id="meter"></div></div>
+      </div>
+    </div>
+
+    <div class="buttons">
+      <button class="act" id="lapReset" disabled>랩</button>
+      <button class="act" id="startStop">시작</button>
+    </div>
+
+    <div class="offers">
+      <h3>도착한 합격 통보</h3>
+      <div id="laps"><div class="empty">랩을 누를 때마다 합격 통보가 하나씩 도착합니다.</div></div>
+    </div>
+    <div class="hint">Space 시작/정지 · L 랩/재설정</div>
+  </div>
+</div>
+
+<script>
+  const $ = id => document.getElementById(id);
+  const display = $('display'), startStop = $('startStop'), lapReset = $('lapReset');
+  const stageEl = $('stage'), jobsEl = $('jobs'), jobsUp = $('jobsUp'), ratioEl = $('ratio');
+  const meterEl = $('meter'), lapsEl = $('laps'), statusText = $('statusText');
+  const canvas = $('sky'), ctx = canvas.getContext('2d');
+
+  /* ── 스탑워치 상태 ── */
+  let running = false, startTime = 0, elapsed = 0, lapStart = 0, laps = [], rafId = null;
+  const pad = n => String(n).padStart(2, '0');
+  function format(ms) {
+    const h = Math.floor(ms / 3600000);
+    return (h ? h + ':' : '') + pad(Math.floor(ms / 60000) % 60) + ':' +
+      pad(Math.floor(ms / 1000) % 60) + '.' + pad(Math.floor(ms / 10) % 100);
+  }
+  const total = () => running ? elapsed + (performance.now() - startTime) : elapsed;
+  // 아침이 밝아오는 정도 (0 = 새벽, 1 = 활기찬 아침), 약 1분에 걸쳐 밝아짐
+  const dawn = ms => 1 - Math.exp(-ms / 25000);
+  const jobsAt = ms => Math.floor(Math.pow(ms / 1000, 1.35) * 21);
+
+  /* ── 채용 뉴스 티커 ── */
+  const news = [
+    ['IT·개발 채용', 1.6], ['신입 공채', 1.3], ['청년 고용률', .5], ['제조·생산직 채용', 1.0],
+    ['디자인 직군 공고', 1.2], ['공공기관 채용', .8], ['스타트업 채용', 1.9], ['경력직 이직 제안', 1.4]
+  ];
+  $('tape').innerHTML = [0, 1].map(() => news.map(([n]) =>
+    `<span class="tape-item">${n}<b>▲ 0.0%</b></span>`).join('')).join('');
+  const tapeEls = [...$('tape').querySelectorAll('b')];
+  function updateTape(p) {
+    tapeEls.forEach((el, i) => el.textContent = `▲ ${(1.2 + p * 38 * news[i % news.length][1]).toFixed(1)}%`);
+  }
+
+  /* ── 하늘 + 도시 ── */
+  const SKY = [
+    [[15, 23, 51], [60, 58, 110]],    // 새벽
+    [[58, 74, 138], [255, 154, 107]], // 해 뜰 무렵
+    [[120, 186, 255], [255, 226, 184]] // 아침
+  ];
+  const mix = (a, b, t) => a.map((v, i) => Math.round(v + (b[i] - v) * t));
+  const rgb = c => `rgb(${c[0]},${c[1]},${c[2]})`;
+  function skyAt(p) {
+    const [a, b, t] = p < .5 ? [SKY[0], SKY[1], p / .5] : [SKY[1], SKY[2], (p - .5) / .5];
+    return [mix(a[0], b[0], t), mix(a[1], b[1], t)];
+  }
+
+  let buildings = [];
+  function buildCity(w, h) {
+    buildings = [];
+    const base = Math.min(240, h * .32);
+    for (let x = -10; x < w + 10;) {
+      const bw = 44 + Math.random() * 70;
+      const bh = base * (.45 + Math.random() * .55);
+      const cols = Math.floor((bw - 12) / 13), rows = Math.floor((bh - 18) / 17);
+      const windows = [];
+      for (let r = 0; r < rows; r++) for (let c = 0; c < cols; c++)
+        windows.push({ x: 8 + c * 13, y: 12 + r * 17, on: Math.pow(Math.random(), .85) });
+      buildings.push({ x, bw, bh, windows, back: Math.random() < .4 });
+      x += bw + 2 + Math.random() * 6;
+    }
+    buildings.sort((a, b) => b.back - a.back); // 뒤쪽 건물 먼저
+  }
+
+  function resize() {
+    const dpr = window.devicePixelRatio || 1;
+    canvas.width = innerWidth * dpr; canvas.height = innerHeight * dpr;
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    buildCity(innerWidth, innerHeight);
+    paint(dawn(total()));
+  }
+
+  function paint(p) {
+    const w = innerWidth, h = innerHeight;
+    const [top, bottom] = skyAt(p);
+    const g = ctx.createLinearGradient(0, 0, 0, h);
+    g.addColorStop(0, rgb(top)); g.addColorStop(1, rgb(bottom));
+    ctx.fillStyle = g; ctx.fillRect(0, 0, w, h);
+
+    // 떠오르는 해
+    const sunY = h * (1.02 - p * .72), sunX = w * .84, r = 46 + p * 10;
+    const glow = ctx.createRadialGradient(sunX, sunY, r * .4, sunX, sunY, r * 5);
+    glow.addColorStop(0, `rgba(255,214,140,${.55 * p + .1})`); glow.addColorStop(1, 'rgba(255,214,140,0)');
+    ctx.fillStyle = glow; ctx.fillRect(0, 0, w, h);
+    ctx.fillStyle = rgb(mix([255, 150, 90], [255, 236, 170], p));
+    ctx.beginPath(); ctx.arc(sunX, sunY, r, 0, Math.PI * 2); ctx.fill();
+
+    // 새벽 별
+    if (p < .5) {
+      ctx.fillStyle = `rgba(255,255,255,${(.5 - p) * 1.4})`;
+      for (let i = 0; i < 60; i++) {
+        const sx = (i * 137.5) % w, sy = (i * 71.3) % (h * .45);
+        ctx.fillRect(sx, sy, 1.5, 1.5);
+      }
+    }
+
+    // 도시: 시간이 갈수록 사무실 불이 하나씩 켜짐 = 채워지는 일자리
+    for (const b of buildings) {
+      const y0 = h - b.bh * (b.back ? 1.25 : 1);
+      ctx.fillStyle = b.back ? rgb(mix([38, 42, 78], [120, 128, 170], p)) : rgb(mix([22, 25, 48], [52, 58, 92], p));
+      ctx.fillRect(b.x, y0, b.bw, h - y0);
+      if (b.back) continue;
+      for (const win of b.windows) {
+        const lit = win.on < p * 1.08;
+        ctx.fillStyle = lit ? '#ffd166' : 'rgba(255,255,255,.06)';
+        ctx.fillRect(b.x + win.x, y0 + win.y, 7, 10);
+      }
+    }
+  }
+
+  /* ── 화면 갱신 ── */
+  const stages = [
+    [0.00, '채용의 문이 열리고 있어요', '새벽 6시, 출근 준비'],
+    [0.20, '서류 합격 소식이 들려와요', '아침 7시, 첫차 출발'],
+    [0.45, '면접 일정이 줄줄이 잡혀요', '아침 8시, 사무실 불이 켜지는 중'],
+    [0.70, '여기저기서 합격 전화가 와요', '아침 9시, 첫 출근'],
+    [0.90, '모두가 일하러 가는 아침이에요', '활기찬 오전']
+  ];
+  let lastTape = 0, lastJobs = 0;
+  function render(now) {
+    const t = total(), p = dawn(t), jobs = jobsAt(t);
+    display.textContent = format(t);
+    jobsEl.textContent = jobs.toLocaleString('ko-KR');
+    const ratio = .6 + p * .9;
+    ratioEl.textContent = ratio.toFixed(2);
+    meterEl.style.width = Math.min(100, ratio / 1.5 * 100) + '%';
+    if (t > 0) {
+      const s = stages.filter(([v]) => p >= v).pop();
+      stageEl.textContent = s[1]; statusText.textContent = s[2];
+    }
+    if (now - lastTape > 300) {
+      updateTape(p);
+      jobsUp.textContent = running && jobs > lastJobs ? `+${(jobs - lastJobs).toLocaleString('ko-KR')}` : '';
+      lastJobs = jobs; lastTape = now;
+    }
+    paint(p);
+  }
+  function loop(now) { render(now); rafId = requestAnimationFrame(loop); }
+
+  /* ── 합격 통보 (랩) ── */
+  const roles = ['프론트엔드 개발자', '브랜드 디자이너', '데이터 분석가', '마케터', '생산관리 엔지니어',
+    '간호사', '회계 담당자', '서비스 기획자', '연구원', '영업 매니저', '물류 관리자', '교사'];
+  function renderLaps() {
+    if (!laps.length) {
+      lapsEl.innerHTML = '<div class="empty">랩을 누를 때마다 합격 통보가 하나씩 도착합니다.</div>';
+      return;
+    }
+    lapsEl.innerHTML = '';
+    laps.forEach((t, i) => {
+      const el = document.createElement('div');
+      el.className = 'offer';
+      el.innerHTML = `<div class="stamp">합격</div>
+        <div class="info"><b>${roles[i % roles.length]}</b><span>랩 ${i + 1} · 최종 합격</span></div>
+        <div class="t">${format(t)}</div>`;
+      lapsEl.prepend(el);
+    });
+  }
+
+  /* ── 버튼 ── */
+  startStop.addEventListener('click', () => {
+    if (running) {
+      elapsed = total(); running = false;
+      cancelAnimationFrame(rafId); render(performance.now());
+      startStop.textContent = '시작'; startStop.classList.remove('running');
+      lapReset.textContent = '재설정';
+      document.body.classList.remove('running');
+    } else {
+      startTime = performance.now(); running = true;
+      rafId = requestAnimationFrame(loop);
+      startStop.textContent = '정지'; startStop.classList.add('running');
+      lapReset.textContent = '랩'; lapReset.disabled = false;
+      document.body.classList.add('running');
+    }
+  });
+
+  lapReset.addEventListener('click', () => {
+    if (running) {
+      const now = total();
+      laps.push(now - lapStart); lapStart = now;
+      renderLaps();
+    } else {
+      elapsed = 0; lapStart = 0; laps = []; lastJobs = 0;
+      renderLaps(); render(performance.now());
+      stageEl.textContent = '버튼을 누르면 하루가 시작됩니다';
+      statusText.textContent = '새벽 6시, 출근 준비';
+      lapReset.textContent = '랩'; lapReset.disabled = true;
+    }
+  });
+
+  document.addEventListener('keydown', e => {
+    if (e.code === 'Space') { e.preventDefault(); startStop.click(); }
+    if (e.key === 'l' || e.key === 'L') { if (!lapReset.disabled) lapReset.click(); }
+  });
+
+  window.addEventListener('resize', resize);
+  resize();
+  render(performance.now());
+</script>
+</body>
+</html>
